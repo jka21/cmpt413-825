@@ -1,4 +1,4 @@
-import sys, codecs, optparse, os, heapq
+import sys, codecs, optparse, os, heapq, re
 
 optparser = optparse.OptionParser()
 optparser.add_option("-c", "--unigramcounts", dest='counts1w', default=os.path.join('data', 'count_1w.txt'), help="unigram counts")
@@ -47,55 +47,48 @@ class Entry():
 
 with open(opts.input) as f:	
 	for line in f:
-		utf8line = unicode(line.strip(), 'utf-8')					# a line read from input file
-		line_length = len(utf8line)									# length of read line
-		chart = {}													# the chart to store best solutions
-		heap = []													# the heap
-		matched_words = [n for n in range(0, line_length)]				# list of all words from Pw that match input line at all possible positions
-																	# matched_words[i] is the list of all words from Pw that matche input line at position i
+		utf8line = unicode(line.strip(), 'utf-8')		# a line read from input file
+		line_length = len(utf8line)				# length of read line
+		chart = {}						# the chart to store best solutions
+		heap = []						# the heap
+		matched_words = [[] for n in range(0, line_length)]	# list of all words from Pw that match input line at all possible positions
+									# matched_words[i] is the list of all words from Pw that matche input line at position i
 		
 		# Build matched_word_position list
+		for word in Pw:
+			matched_position = [m.start() for m in re.finditer(word, utf8line)]
+			for i in matched_position:
+				matched_words[i].append(word)
+		# Dealing with unknown words: each single character will be consider as a word
 		for i in range(0, line_length):
-			matched_words[i] = []
-			for word in Pw:
-				if utf8line.find(word,i) == i:
-					matched_words[i].append(word)
+			if len(matched_words[i]) == 0:
+				matched_words[i].append(utf8line[i])
 			
 		# Initialize the heap		
 		for word in matched_words[0]:
 			"For every word in Pw that matches input at position 0, create a new entry and push it into the heap"
 			entry = Entry(word,0, log(Pw(word)),None)
 			heapq.heappush(heap, (0, entry))
-		if len(matched_words[0]) == 0:
-			"If there's no word matches input at position 0 - consider the first character is a word, create a new entry and push it into the heap"
-			entry = Entry(utf8line[0], 0, log(Pw(utf8line[0])), None)
-			heapq.heappush(heap, (0, entry))
 				
 		# Iteratively fill in chart[i] for all i
 		while(len(heap)):
-			entry = heapq.heappop(heap)[1]										# Pop the first entry in the heap
-			endindex = entry.startPos + len(entry.word)							# Compute the "endindex" value: the position to be considered for the next segmentation
+			entry = heapq.heappop(heap)[1]						# Pop the first entry in the heap
+			endindex = entry.startPos + len(entry.word)				# Compute the "endindex" value: the position to be considered for the next segmentation
 			preventry = chart[endindex] if chart.has_key(endindex) else None	# Check if there is already a known segmentation at this position
 			if preventry != None:
-				if (preventry.logP <= entry.logP):								# If the "preventry" (known segmentation) has lower probability than the new one
-					chart[endindex] = entry										# update the chart (stores the known best solution) with the new segmentation
+				if (preventry.logP <= entry.logP):				# If the "preventry" (known segmentation) has lower probability than the new one
+					chart[endindex] = entry					# update the chart (stores the known best solution) with the new segmentation
 				else: continue
 			else:
-				chart[endindex] = entry									# or if there is no "preventry", update the current segmentation as the known best solution
+				chart[endindex] = entry						# or if there is no "preventry", update the current segmentation as the known best solution
 
 			# Find the next segmentation from the "endindex" position
 			if endindex >= line_length:
-				continue;				# if we reached the end of the input line, just continue...
+				continue;	# if we reached the end of the input line, just continue...
 			
-			if len(matched_words[endindex]) > 0:
-				# If we found a newword that matches input at position "endindex" and it's not in the heap yet, then push it into the heap
-				for newword in matched_words[endindex]:										
-					newentry = Entry(newword, endindex, entry.logP + log(Pw(newword)), entry)
-					if (endindex, newentry) not in heap:
-						heapq.heappush(heap, (endindex, newentry))
-			else:
-				# else, consider the next character is a word, then push it into the heap"
-				newentry = Entry(utf8line[endindex], endindex, log(Pw(utf8line[endindex])), entry)
+			# If we found a newword that matches input at position "endindex" and it's not in the heap yet, then push it into the heap
+			for newword in matched_words[endindex]:										
+				newentry = Entry(newword, endindex, entry.logP + log(Pw(newword)), entry)
 				if (endindex, newentry) not in heap:
 					heapq.heappush(heap, (endindex, newentry))
 	
@@ -103,8 +96,8 @@ with open(opts.input) as f:
 		finalindex = len(utf8line)
 		finalentry = chart[finalindex]
 		index = []
+		# Trace back the solution by backPointer
 		while finalentry != None:
-			"Trace back the solution by backPointer"
 			index.insert(0,[finalentry.startPos, len(finalentry.word)])			
 			finalentry = finalentry.backPointer
 		
