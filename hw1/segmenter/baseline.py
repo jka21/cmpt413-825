@@ -52,7 +52,7 @@ with open(opts.input) as f:
 		chart = {}						# the chart to store best solutions
 		heap = []						# the heap
 		matched_words = [[] for n in range(0, line_length)]	# list of all words from Pw that match input line at all possible positions
-									# matched_words[i] is the list of all words from Pw that matche input line at position i
+									# matched_words[i] is the list of all words from Pw that match input line at position i
 		
 		# Build matched_word_position list
 		for word in Pw:
