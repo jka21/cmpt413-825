@@ -53,14 +53,13 @@ with open(opts.input) as f:
 		heap = []						# the heap
 		matched_words = [[] for n in range(0, line_length)]	# list of all words from Pw that match input line at all possible positions
 									# matched_words[i] is the list of all words from Pw that match input line at position i
-		#matched_words = [[] for n in range(0, line_length)]
 		
 		# Build matched_word_position list
 		for i in range(0, line_length):
 			for j in range(i+1, line_length+1):
 				if utf8line[i:j] in Pw:
 					matched_words[i].append(utf8line[i:j])
-		
+
 		# Dealing with unknown words: each single character will be consider as a word
 		for i in range(0, line_length):
 			if len(matched_words[i]) == 0:
