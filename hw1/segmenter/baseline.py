@@ -61,11 +61,6 @@ with open(opts.input) as f:
 				if utf8line[i:j] in Pw:
 					matched_words[i].append(utf8line[i:j])
 		
-		#for word in Pw:
-		#	matched_position = [m.start() for m in re.finditer(word, utf8line)]
-		#	for i in matched_position:
-		#		matched_words[i].append(word)
-		
 		# Dealing with unknown words: each single character will be consider as a word
 		for i in range(0, line_length):
 			if len(matched_words[i]) == 0:
