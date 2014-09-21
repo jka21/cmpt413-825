@@ -67,7 +67,7 @@ with open(opts.input) as f:
 				while j < line_length and len(matched_words[j]) == 0:					    
 					j += 1
 					matched_words[i].append(utf8line[i:j])			
-
+		#print matched_words
 		# Initialize the heap		
 		for word in matched_words[0]:
 			"For every word in Pw that matches input at position 0, create a new entry and push it into the heap"
@@ -77,9 +77,13 @@ with open(opts.input) as f:
 		# Iteratively fill in chart[i] for all i
 		while(len(heap)):
 			entry = heapq.heappop(heap)[1]						# Pop the first entry in the heap
+			print 'entry:'+entry.word + ' ' + str(entry.logP)
+			print 'entryStartPos:' + str(entry.startPos)
+			print 'entry length:' + str(len(entry.word))
 			endindex = entry.startPos + len(entry.word)				# Compute the "endindex" value: the position to be considered for the next segmentation			
 			preventry = chart[endindex] if chart.has_key(endindex) else None	# Check if there is already a known segmentation at this position
 			if preventry != None:
+				print 'preventry:' + preventry.word + ' ' +str(preventry.logP)
 				if (preventry.logP <= entry.logP):				# If the "preventry" (known segmentation) has lower probability than the new one
 					chart[endindex] = entry					# update the chart (stores the known best solution) with the new segmentation
 				else: continue
@@ -89,13 +93,14 @@ with open(opts.input) as f:
 			# Find the next segmentation from the "endindex" position
 			if endindex >= line_length:
 				continue;	# if we reached the end of the input line, just continue...
-
+			print endindex
 			# If we found a newword that matches input at position "endindex" and it's not in the heap yet, then push it into the heap
 			for newword in matched_words[endindex]:										
 				newentry = Entry(newword, endindex, entry.logP + log(Pw(newword)), entry)
+				print newentry.word + ' ' + str(Pw(newword)) + ' ' + str(log(Pw(newword))) + ' ' + str(newentry.logP)
 				if (endindex, newentry) not in heap:
 					heapq.heappush(heap, (endindex, newentry))
-
+			print '======'	
 		# Get the best segmentation			
 		finalindex = len(utf8line)
 		finalentry = chart[finalindex]
