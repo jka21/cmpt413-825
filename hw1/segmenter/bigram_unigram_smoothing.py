@@ -1,4 +1,5 @@
-import sys, codecs, optparse, os, heapq, re
+
+import sys, codecs, optparse, os, heapq
 
 optparser = optparse.OptionParser()
 optparser.add_option("-c", "--unigramcounts", dest='counts1w', default=os.path.join('data', 'count_1w.txt'), help="unigram counts")
@@ -8,8 +9,9 @@ optparser.add_option("-i", "--inputfile", dest="input", default=os.path.join('da
 
 class Pdist(dict):
 	"A probability distribution estimated from counts in datafile."
-	def __init__(self, data=[]):
-		for key,count in data:
+	def __init__(self, filename, sep='\t', N=None, missingfn=None):
+		for line in file(filename):		
+			(key,count) = line.split(sep)
 			key = key.decode('utf-8')
 			self[key] = self.get(key, 0) + int(count)			
 		self.N = float(sum(self.itervalues()))
@@ -18,13 +20,39 @@ class Pdist(dict):
 		if key in self: return self[key]/self.N
 		else: return self.missingfn(key, self.N)
 
-def datafile(name, sep='\t'):
-    "Read key,value pairs from file."
-    for line in file(name):
-        yield line.split(sep)
+class Pdist2(dict):
+	"A probability distribution estimated from counts in datafile."
+	def __init__(self, filename, sep='\t', N=None, missingfn=None):
+	        self.maxlen = 0 
+		self.N = 0
+	        for line in file(filename):
+			(key, freq) = line.split(sep)
+			try:
+				utf8key = unicode(key, 'utf-8')
+			except:
+				raise ValueError("Unexpected error %s" % (sys.exc_info()[0]))
+		
+			spacePos = utf8key.find(' ')
+			utf8key = utf8key.strip().replace(" ", "")
+			self[utf8key] = self.get(utf8key, {})
+			self[utf8key][spacePos] = int(freq)
+			self.N += int(freq)
+
+			self.maxlen = max(len(utf8key), self.maxlen)
+	        #self.N = float(N or sum(self.itervalues()))
+	        self.missingfn = missingfn or (lambda k, N: 1./N)
+	
+	def __call__(self, key):
+		spacePos = key.find(' ')
+		key = key.strip().replace(" ", "")
+        	if key in self: return float(self[key][spacePos])/float(self.N)
+        	#else: return self.missingfn(key, self.N)
+        	else: return self.missingfn(key, self.N)
+        	#else: return None
 
 # the default segmenter does not use any probabilities, but you could ...
-Pw  = Pdist(datafile(opts.counts1w))
+Pw2 = Pdist2(opts.counts2w)
+Pw = Pdist(opts.counts1w)
 
 old = sys.stdout
 sys.stdout = codecs.lookup('utf-8')[-1](sys.stdout)
@@ -53,9 +81,10 @@ with open(opts.input) as f:
 		heap = []						# the heap
 		matched_words = [[] for n in range(0, line_length)]	# list of all words from Pw that match input line at all possible positions
 									# matched_words[i] is the list of all words from Pw that match input line at position i
+		
 		# Build matched_word_position list
 		for i in range(0, line_length):
-			for j in range(i+1, min(line_length+1, i+4)):
+			for j in range(i+1, line_length+1):
 				if utf8line[i:j] in Pw:
 					matched_words[i].append(utf8line[i:j])
 
@@ -63,15 +92,27 @@ with open(opts.input) as f:
 		for i in range(0, line_length):			
 			if len(matched_words[i]) == 0:
 				matched_words[i].append(utf8line[i])
-	               		j = i + 1
+                		j = i + 1
 				while j < line_length and len(matched_words[j]) == 0:					    
 					j += 1
 					matched_words[i].append(utf8line[i:j])			
 
+		# Build matched_word_position list
+#		for i in range(0, line_length):
+#			for j in range(i+1, line_length+1):
+#				if utf8line[i:j] in Pw:
+#					dict = Pw[utf8line[i:j]]
+#					for spacePos in dict:
+#						word = utf8line[i:j][0:spacePos] + ' ' + utf8line[i:j][spacePos:]
+#						print word
+#						matched_words[i].append(word)
+
 		# Initialize the heap		
 		for word in matched_words[0]:
 			"For every word in Pw that matches input at position 0, create a new entry and push it into the heap"
-			entry = Entry(word,0, log(Pw(word)),None)
+			count = Pw2("<S>"
+			logP = log(count/(count2*Pw.N))
+			entry = Entry(word,0, ,None)
 			heapq.heappush(heap, (0, entry))
 				
 		# Iteratively fill in chart[i] for all i
@@ -92,7 +133,15 @@ with open(opts.input) as f:
 
 			# If we found a newword that matches input at position "endindex" and it's not in the heap yet, then push it into the heap
 			for newword in matched_words[endindex]:										
-				newentry = Entry(newword, endindex, entry.logP + log(Pw(newword)), entry)
+				prevword = entry.word
+				if prevword+newword in Pw2 and len(prevword) in Pw2[prevword+newword]:
+					count = Pw2[prevword+newword][len(prevword)]
+				else: count = 1
+				if newword in Pw:
+					count2 = Pw[newword]
+				else: count2 = 1
+				logP = entry.logP + log(count/(count2*Pw.N))
+				newentry = Entry(newword, endindex, entry.logP + logP, entry)
 				if (endindex, newentry) not in heap:
 					heapq.heappush(heap, (endindex, newentry))
 
